@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "datasource",
+  "name": "DuckDB / DuckLake",
+  "id": "local-duckdb-datasource",
+  "metrics": true,
+  "backend": true,
+  "alerting": true,
+  "executable": "gpx_local_duckdb",
+  "info": {
+    "description": "Query local DuckDB files and local DuckLake storage from Grafana.",
+    "author": { "name": "Contributors" },
+    "keywords": ["duckdb", "ducklake", "sql", "parquet", "local"],
+    "logos": { "small": "img/database.svg", "large": "img/database.svg" },
+    "links": [],
+    "screenshots": [],
+    "version": "0.1.0",
+    "updated": "2026-09-09"
+  },
+  "dependencies": { "grafanaDependency": ">=12.4.0", "plugins": [] }
+}
