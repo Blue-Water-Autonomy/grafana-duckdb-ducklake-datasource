@@ -14,32 +14,19 @@ Paths are **absolute paths inside the Grafana server/container**, not the browse
 
 Native DuckDB files cannot have a writer process alongside independent reader processes. Existing-file mode is for files without an active writer; embedded mode gives the plugin ownership of its database. Embedded views can read new, complete Parquet files published by another process. Use DuckLake for concurrent database ingestion. See [DuckDB concurrency](https://duckdb.org/docs/current/connect/concurrency).
 
-## Run locally
+## Run the complete example
 
-Requires Docker Compose. The image builds the frontend and the backend for the container architecture, and preinstalls matching DuckLake and PostgreSQL extensions.
+The [examples directory](examples/README.md) contains a runnable stack with five configured data sources, sample data, continuous ingestion, and a provisioned dashboard. It covers existing read-only DuckDB files, embedded DuckDB with inline SQL, embedded DuckDB with a setup file over Parquet, and DuckLake with both local and verified TLS PostgreSQL catalogs.
 
-```sh
-docker compose up --build -d
-```
-
-Open http://localhost:3000 and log in with `admin` / `admin` (or set `GRAFANA_ADMIN_PASSWORD`). The provisioned **Local DuckDB** data source has an `example_metrics` view. Query it in Explore:
-
-```sql
-SELECT time, device, value
-FROM example_metrics
-WHERE $__timeFilter(time)
-ORDER BY time
-```
-
-Choose **Time series** for a graph, or **Table** for rows. **Local DuckLake** initializes an empty catalog on first use. Start the optional, separate ingestion process:
+Requires Docker Compose 2.20 or newer. From the repository root:
 
 ```sh
-docker compose --profile ingest up --build -d
+docker compose up --build -d --wait
 ```
 
-Then query `measurements` through Local DuckLake. Both processes mount the same volume at `/var/lib/ducklake/data`. PostgreSQL is reachable only on the Compose network. The example uses a catalog owner account and a development password; use your local credentials and a PostgreSQL reader role for an existing lake. `DUCKLAKE_PASSWORD` changes the initial database password only; changing it after the PostgreSQL volume is initialized also requires changing the database role password.
+Open [the example dashboard](http://localhost:3000/d/duckdb-ducklake-examples) and log in with `admin` / `admin`. The same command works from `examples/`. Every source has data before Grafana starts, and both lakes receive new measurements every five seconds. PostgreSQL stays on the private Compose network; data remains in local volumes.
 
-`docker compose down` stops the example and preserves the database volumes.
+See [examples/README.md](examples/README.md) for the data-source matrix, configuration, alternate ports, and lifecycle commands. `docker compose down` stops the stack and preserves the example volumes.
 
 ## Configure an existing DuckDB file
 
@@ -130,12 +117,12 @@ The integration tests use disposable PostgreSQL containers and temporary certifi
 To run browser tests against the local example:
 
 ```sh
-docker compose --profile ingest up --build -d
+docker compose up --build -d --wait
 npx playwright install chromium
 npm run e2e
 ```
 
-These tests verify configuration, embedded setup through the UI, table and time-series queries in Explore, and ingested DuckLake data. Screenshots are written under `test-results/`.
+These tests verify all five example data sources, embedded setup through the UI, table and time-series queries in Explore, concurrent ingestion, and the provisioned dashboard with its device filter. Screenshots are written under `test-results/`.
 
 `make build` creates `dist/module.js`, `dist/plugin.json`, assets and a backend binary for the current platform. For Linux deployment from macOS, use the Docker build; CGO requires a compiler for the target platform. Install the complete `dist` directory under Grafana's plugin directory and allow the unsigned plugin ID `local-duckdb-datasource` in your local Grafana configuration. No signing or publishing is performed by this repository.
 

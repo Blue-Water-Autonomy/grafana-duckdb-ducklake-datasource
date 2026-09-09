@@ -23,7 +23,7 @@ integration:
 	python3 scripts/test-ducklake.py
 
 up:
-	docker compose up --build -d
+	docker compose up --build -d --wait
 
 down:
 	docker compose down

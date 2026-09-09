@@ -30,8 +30,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: docker compose --profile ingest up --build -d
+      - run: docker compose -f examples/compose.yaml up --build -d --wait
       - run: curl --retry 30 --retry-all-errors --retry-delay 1 --fail http://localhost:3000/api/health
       - run: npm run e2e
       - if: always()
-        run: docker compose --profile ingest down
+        run: docker compose -f examples/compose.yaml down

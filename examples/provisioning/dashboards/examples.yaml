@@ -1,0 +1,12 @@
+apiVersion: 1
+providers:
+  - name: DuckDB and DuckLake examples
+    orgId: 1
+    folder: Examples
+    folderUid: duckdb-examples
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

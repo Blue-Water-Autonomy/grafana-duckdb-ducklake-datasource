@@ -1,31 +1,20 @@
-"""A separate writer using the same local PostgreSQL catalog and Parquet volume."""
-import os
+"""Publish fresh measurements to both lakes from a separate process."""
+import math
 import time
 
-import duckdb
+from catalog import connect
 
-
-def literal(value):
-    return "'" + value.replace("'", "''") + "'"
-
-
-connection = duckdb.connect(config={"extension_directory": "/opt/duckdb/extensions"})
-connection.execute("LOAD ducklake; LOAD postgres")
-connection.execute(
-    "CREATE SECRET writer (TYPE postgres, HOST "
-    + literal(os.environ.get("DUCKLAKE_HOST", "localhost"))
-    + ", DATABASE 'ducklake', USER 'ducklake', PASSWORD "
-    + literal(os.environ["DUCKLAKE_PASSWORD"])
-    + ")"
-)
-connection.execute("""
-    ATTACH 'ducklake:postgres:sslmode=disable' AS lake (
-        METADATA_PARAMETERS MAP {'SECRET': 'writer'},
-        DATA_PATH '/var/lib/ducklake/data', OVERRIDE_DATA_PATH false
-    )
-""")
-connection.execute("CREATE TABLE IF NOT EXISTS lake.measurements (time TIMESTAMPTZ, device VARCHAR, value DOUBLE)")
-while True:
-    connection.execute("INSERT INTO lake.measurements SELECT now(), 'sensor-1', 20 + random() * 5")
-    print("Inserted a measurement", flush=True)
-    time.sleep(5)
+connections = [connect(tls=False), connect(tls=True)]
+try:
+    while True:
+        for db in connections:
+            for sensor in range(1, 4):
+                value = 19 + sensor * 2 + math.sin(time.time() / 90 + sensor) * 3
+                db.execute('INSERT INTO lake.measurements VALUES (now(), ?, ?)', [f'sensor-{sensor}', value])
+            # Bound the demo's live history while retaining enough data for the dashboard.
+            db.execute("DELETE FROM lake.measurements WHERE time < now() - INTERVAL '6 hours'")
+        print('Inserted measurements into both DuckLake catalogs.', flush=True)
+        time.sleep(5)
+finally:
+    for db in connections:
+        db.close()
