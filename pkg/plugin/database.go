@@ -19,15 +19,6 @@ func openDatabase(ctx context.Context, s Settings) (*sql.DB, error) {
 		params.Set("extension_directory", s.ExtensionDirectory)
 	}
 	switch s.Mode {
-	case ModeReadOnly:
-		info, err := os.Stat(path)
-		if err != nil {
-			return nil, fmt.Errorf("read-only database must already exist: %w", err)
-		}
-		if !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("database path must point to a regular file")
-		}
-		params.Set("access_mode", "read_only")
 	case ModeEmbedded:
 		if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 			return nil, fmt.Errorf("create database directory: %w", err)

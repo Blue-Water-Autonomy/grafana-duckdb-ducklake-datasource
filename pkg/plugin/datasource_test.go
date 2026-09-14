@@ -70,7 +70,7 @@ func TestEmbeddedParquetViewsAndReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 	setupPath := filepath.Join(root, "setup.sql")
-	setup := "CREATE OR REPLACE VIEW measurements AS SELECT * FROM read_parquet(" + sqlLiteral(parquet) + "); CREATE TABLE IF NOT EXISTS setup_runs AS SELECT 1 AS count;"
+	setup := "CREATE OR REPLACE VIEW measurements AS SELECT * FROM read_parquet(" + sqlLiteral(filepath.Join(root, "*.parquet")) + "); CREATE TABLE IF NOT EXISTS setup_runs AS SELECT 1 AS count;"
 	if err := os.WriteFile(setupPath, []byte(setup), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -89,23 +89,41 @@ func TestEmbeddedParquetViewsAndReopen(t *testing.T) {
 		go func() { defer wg.Done(); result(t, ds, "SELECT * FROM measurements", "table") }()
 	}
 	wg.Wait()
+	// An independent writer publishes a complete file while Grafana keeps its
+	// embedded database open. Subsequent queries must discover the new rows.
+	writer, err := sql.Open("duckdb", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	staging := filepath.Join(root, "next.tmp")
+	_, err = writer.Exec("COPY (SELECT TIMESTAMP '2026-01-01 00:01:00' AS time, 43.5 AS value) TO " + sqlLiteral(staging) + " (FORMAT PARQUET)")
+	writer.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(staging, filepath.Join(root, "next.parquet")); err != nil {
+		t.Fatal(err)
+	}
+	frame = result(t, ds, "SELECT * FROM measurements ORDER BY time", "time_series")
+	if frame.Rows() != 2 || cell(frame, 1, 1) != 43.5 {
+		t.Fatal("new Parquet measurements were not visible")
+	}
 	ds.Dispose()
-	ro := testSource(t, map[string]any{"mode": ModeReadOnly, "path": path})
-	result(t, ro, "SELECT * FROM measurements", "table")
-	if _, err := ro.db.Exec("CREATE TABLE forbidden(i INTEGER)"); err == nil {
-		t.Fatal("read-only connection accepted DDL")
+	reopened := testSource(t, map[string]any{"mode": ModeEmbedded, "path": path, "setupSqlPath": setupPath})
+	if result(t, reopened, "SELECT * FROM measurements", "table").Rows() != 2 {
+		t.Fatal("reopened view lost measurements")
 	}
 }
 
-func TestReadOnlyNeverCreatesMissingFile(t *testing.T) {
+func TestRemovedModeDoesNotOpenDatabase(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing", "analytics.duckdb")
-	encoded, _ := json.Marshal(map[string]any{"mode": ModeReadOnly, "path": path})
+	encoded, _ := json.Marshal(map[string]any{"mode": "duckdb-read-only", "path": path})
 	_, err := NewDatasource(context.Background(), backend.DataSourceInstanceSettings{JSONData: encoded})
-	if err == nil || !strings.Contains(err.Error(), "already exist") {
+	if err == nil || !strings.Contains(err.Error(), "unknown connection mode") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
-		t.Fatal("read-only mode created a directory")
+		t.Fatal("removed mode created a directory")
 	}
 }
 

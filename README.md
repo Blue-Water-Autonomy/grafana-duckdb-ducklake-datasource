@@ -1,22 +1,21 @@
 # DuckDB / DuckLake for Grafana
 
-A Grafana data source for databases and files alongside your Grafana instance. The plugin embeds DuckDB 1.5.5 in its Go backend and presents standard Grafana configuration and SQL editors. No hosted account is required.
+A Grafana data source for live data alongside your Grafana instance. The plugin embeds DuckDB 1.5.5 in its Go backend and presents standard Grafana configuration and SQL editors. No hosted account is required.
 
 ## Connection modes
 
 | Mode | Use | Lifecycle |
 | --- | --- | --- |
-| Existing DuckDB | Query a pre-existing `.duckdb` file | Opens the file with `access_mode=read_only`; never creates a missing file. |
-| Embedded DuckDB | Keep a standalone database with views over local Parquet or other local files | Creates missing parent directories and the database, then runs administrator setup SQL. |
+| Embedded DuckDB | Query newly published local files through persistent views | Creates missing parent directories and the database, then runs administrator setup SQL. |
 | DuckLake | Query while another process ingests data | Uses a local or remote PostgreSQL catalog and a local Parquet directory; attaches the lake read-only. |
 
-Paths are **absolute paths inside the Grafana server/container**, not the browser. Mount files and directories accordingly. Use one embedded data source per DuckDB file. Do not open an embedded file through a second read-only data source at the same time.
+Paths are **absolute paths inside the Grafana server/container**, not the browser. Mount files and directories accordingly. Use one embedded data source per DuckDB file.
 
-Native DuckDB files cannot have a writer process alongside independent reader processes. Existing-file mode is for files without an active writer; embedded mode gives the plugin ownership of its database. Embedded views can read new, complete Parquet files published by another process. Use DuckLake for concurrent database ingestion. See [DuckDB concurrency](https://duckdb.org/docs/current/connect/concurrency).
+Native DuckDB files cannot have a writer process alongside independent reader processes. Embedded mode gives the plugin ownership of its database. Embedded views can read new, complete Parquet files published by another process. Use DuckLake for concurrent database ingestion. See [DuckDB concurrency](https://duckdb.org/docs/current/connect/concurrency).
 
 ## Run the complete example
 
-The [examples directory](examples/README.md) contains a runnable stack with five configured data sources, sample data, continuous ingestion, and a provisioned dashboard. It covers existing read-only DuckDB files, embedded DuckDB with inline SQL, embedded DuckDB with a setup file over Parquet, and DuckLake with both local and verified TLS PostgreSQL catalogs.
+The [examples directory](examples/README.md) contains a runnable stack with four configured data sources, sample data, continuous ingestion, and a provisioned dashboard. It covers embedded DuckDB with inline SQL or a setup file over live Parquet data, and DuckLake with both local and verified TLS PostgreSQL catalogs.
 
 Requires Docker Compose 2.20 or newer. From the repository root:
 
@@ -24,15 +23,9 @@ Requires Docker Compose 2.20 or newer. From the repository root:
 docker compose up --build -d --wait
 ```
 
-Open [the example dashboard](http://localhost:3000/d/duckdb-ducklake-examples) and log in with `admin` / `admin`. The same command works from `examples/`. Every source has data before Grafana starts, and both lakes receive new measurements every five seconds. PostgreSQL stays on the private Compose network; data remains in local volumes.
+Open [the example dashboard](http://localhost:3000/d/duckdb-ducklake-examples) and log in with `admin` / `admin`. The same command works from `examples/`. Every source has data before Grafana starts, and every source receives new measurements every five seconds. PostgreSQL stays on the private Compose network; data remains in local volumes.
 
 See [examples/README.md](examples/README.md) for the data-source matrix, configuration, alternate ports, and lifecycle commands. `docker compose down` stops the stack and preserves the example volumes.
-
-## Configure an existing DuckDB file
-
-Select **DuckDB — existing file, read-only**, enter an existing absolute file path, and Save & test. An example provisioning definition is in `examples/read-only.yaml.example`. The Grafana process needs read access to the file and its containing directory. Stop its writer before opening it in Grafana.
-
-The plugin keeps the file open for the lifetime of the data source. To replace a snapshot file, stop Grafana, replace it, then restart. It does not watch modification times or reopen files underneath active queries.
 
 ## Embedded database and setup script
 
@@ -45,7 +38,7 @@ SELECT * FROM read_parquet('/var/lib/telemetry/*.parquet', union_by_name = true)
 
 Setup runs in a transaction once per data source initialization, including after a restart or settings change. Use idempotent persistent DDL such as `CREATE OR REPLACE VIEW` and `CREATE TABLE IF NOT EXISTS`. Avoid temporary objects and connection-specific state: dashboard queries use a pool of connections. Do not include transaction-control statements (`BEGIN`, `COMMIT`, `ROLLBACK`); the plugin controls the transaction. Changing a setup file on disk takes effect after restarting Grafana or updating the data source configuration.
 
-Globs must match valid files when DuckDB binds the view. Publish complete files atomically into the directory. Grafana needs read access to those files and write access to the embedded database directory. A failed setup fails initialization and rolls back its database changes; it does not remove a newly created empty database file.
+Each dashboard query discovers new files matching the view's glob, without rerunning setup or reopening the database. Setup creates the view; the external ingestion process publishes the data. Globs must match valid files when DuckDB binds the view. Publish complete files atomically into the directory. Grafana needs read access to those files and write access to the embedded database directory. A failed setup fails initialization and rolls back its database changes; it does not remove a newly created empty database file.
 
 ## DuckLake with a PostgreSQL catalog
 
@@ -112,7 +105,7 @@ make check
 make integration
 ```
 
-The integration tests use disposable PostgreSQL containers and temporary certificates (requires `openssl`). They verify concurrent ingestion over plaintext and verified mutual TLS, encrypted catalog sessions, rejection of an untrusted CA or mismatched hostname, and failure when TLS is required but unavailable. Unit tests exercise the real embedded engine, including creation, read-only access, setup rollback, Parquet views, nullable types, time macros, labels, row limits, and cancellation.
+The integration tests use disposable PostgreSQL containers and temporary certificates (requires `openssl`). They verify concurrent ingestion over plaintext and verified mutual TLS, encrypted catalog sessions, rejection of an untrusted CA or mismatched hostname, and failure when TLS is required but unavailable. Unit tests exercise the real embedded engine, including creation, rejection of dashboard writes, setup rollback, live Parquet views, nullable types, time macros, labels, row limits, and cancellation.
 
 To run browser tests against the local example:
 
@@ -122,7 +115,7 @@ npx playwright install chromium
 npm run e2e
 ```
 
-These tests verify all five example data sources, embedded setup through the UI, table and time-series queries in Explore, concurrent ingestion, and the provisioned dashboard with its device filter. Screenshots are written under `test-results/`.
+These tests verify all four example data sources, embedded setup through the UI, table and time-series queries in Explore, concurrent ingestion, and the provisioned dashboard with its device filter. Screenshots are written under `test-results/`.
 
 `make build` creates `dist/module.js`, `dist/plugin.json`, assets and a backend binary for the current platform. For Linux deployment from macOS, use the Docker build; CGO requires a compiler for the target platform. Install the complete `dist` directory under Grafana's plugin directory and allow the unsigned plugin ID `local-duckdb-datasource` in your local Grafana configuration. No signing or publishing is performed by this repository.
 

@@ -1,20 +1,25 @@
-"""Publish fresh measurements to both lakes from a separate process."""
-import math
+"""Publish fresh measurements to local Parquet files and both DuckLake catalogs."""
+from datetime import datetime, timezone
 import time
 
+import duckdb
+
 from catalog import connect
+from parquet import measurements, publish
 
 connections = [connect(tls=False), connect(tls=True)]
+files = duckdb.connect()
 try:
     while True:
+        rows = measurements(datetime.now(timezone.utc))
+        publish(files, rows)
         for db in connections:
-            for sensor in range(1, 4):
-                value = 19 + sensor * 2 + math.sin(time.time() / 90 + sensor) * 3
-                db.execute('INSERT INTO lake.measurements VALUES (now(), ?, ?)', [f'sensor-{sensor}', value])
+            db.executemany('INSERT INTO lake.measurements VALUES (?, ?, ?)', rows)
             # Bound the demo's live history while retaining enough data for the dashboard.
             db.execute("DELETE FROM lake.measurements WHERE time < now() - INTERVAL '6 hours'")
-        print('Inserted measurements into both DuckLake catalogs.', flush=True)
+        print('Published measurements to Parquet and both DuckLake catalogs.', flush=True)
         time.sleep(5)
 finally:
+    files.close()
     for db in connections:
         db.close()

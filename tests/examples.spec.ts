@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const sourceIds = [
-  'example-duckdb-readonly', 'local-duckdb', 'example-duckdb-parquet',
+  'local-duckdb', 'example-duckdb-parquet',
   'local-ducklake', 'example-ducklake-tls',
 ];
 
@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
   expect(response.ok()).toBeTruthy();
 });
 
-test('all five provisioned sources have sample data and both lakes keep ingesting', async ({ page }) => {
+test('all four provisioned sources have sample data and keep ingesting', async ({ page }) => {
   const configured = await page.request.get('/api/datasources');
   const sources = await configured.json();
   expect(sources.map((source: { uid: string }) => source.uid).sort()).toEqual([...sourceIds].sort());
@@ -40,9 +40,10 @@ test('all five provisioned sources have sample data and both lakes keep ingestin
   const tls = await query('example-ducklake-tls', "SELECT ssl, client_dn FROM postgres_query('__ducklake_metadata_lake', 'SELECT ssl, client_dn FROM pg_stat_ssl WHERE pid = pg_backend_pid()')");
   expect(tls[0][0]).toBe(true);
   expect(tls[1][0]).toContain('CN=grafana_reader');
-  for (const uid of ['local-ducklake', 'example-ducklake-tls']) {
-    const initial = (await query(uid, 'SELECT epoch(max(time)) AS newest FROM measurements'))[0][0];
-    await expect.poll(async () => (await query(uid, 'SELECT epoch(max(time)) AS newest FROM measurements'))[0][0], { timeout: 20000 }).toBeGreaterThan(initial);
+  for (const uid of sourceIds) {
+    const table = uid === 'local-duckdb' || uid === 'example-duckdb-parquet' ? 'example_metrics' : 'measurements';
+    const initial = (await query(uid, `SELECT epoch(max(time)) AS newest FROM ${table}`))[0][0];
+    await expect.poll(async () => (await query(uid, `SELECT epoch(max(time)) AS newest FROM ${table}`))[0][0], { timeout: 20000 }).toBeGreaterThan(initial);
   }
 });
 
@@ -70,10 +71,10 @@ test('the example dashboard renders every source and applies its device variable
   });
   await page.goto('/d/duckdb-ducklake-examples?var-device=sensor-2');
   await expect(page.getByText('DuckDB / DuckLake examples', { exact: true }).first()).toBeVisible();
-  for (const title of ['Existing DuckDB', 'Embedded DuckDB · inline SQL', 'Embedded DuckDB · Parquet', 'DuckLake · local catalog', 'DuckLake · TLS catalog']) {
+  for (const title of ['Embedded DuckDB · inline SQL', 'Embedded DuckDB · Parquet', 'DuckLake · local catalog', 'DuckLake · TLS catalog']) {
     await page.getByRole('heading', { name: title, exact: true }).scrollIntoViewIfNeeded();
   }
-  await expect.poll(() => seen.size).toBe(5);
+  await expect.poll(() => seen.size).toBe(4);
   await expect(page.getByRole('columnheader', { name: 'temperature', exact: true })).toBeVisible();
   expect(errors).toEqual([]);
   await page.screenshot({ path: testInfo.outputPath('example-dashboard.png'), fullPage: true });

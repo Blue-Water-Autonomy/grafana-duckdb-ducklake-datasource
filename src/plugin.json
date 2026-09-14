@@ -8,7 +8,7 @@
   "alerting": true,
   "executable": "gpx_local_duckdb",
   "info": {
-    "description": "Query local DuckDB files and local DuckLake storage from Grafana.",
+    "description": "Query live local files with embedded DuckDB or concurrent ingestion with DuckLake.",
     "author": { "name": "Contributors" },
     "keywords": ["duckdb", "ducklake", "sql", "parquet", "local"],
     "logos": { "small": "img/database.svg", "large": "img/database.svg" },

@@ -1,11 +1,7 @@
 import type { DataSourceJsonData } from "@grafana/data";
 import type { DataQuery } from "@grafana/schema";
 
-export type ConnectionMode =
-  | "duckdb-read-only"
-  | "duckdb-embedded"
-  | "duckdb-managed"
-  | "ducklake";
+export type ConnectionMode = "duckdb-embedded" | "duckdb-managed" | "ducklake";
 export type PostgresSSLMode =
   | "disable"
   | "require"

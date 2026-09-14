@@ -1,19 +1,12 @@
-"""Create immutable sample files and demo TLS certificates before readers start."""
+"""Seed live Parquet data and prepare demo TLS certificates before readers start."""
 from pathlib import Path
 import os
 import shutil
 import subprocess
 import tempfile
 
-import duckdb
+from parquet import DIRECTORY, seed
 
-
-SAMPLE_SQL = """
-SELECT i::INTEGER AS minutes_ago,
-       'sensor-' || sensor::VARCHAR AS device,
-       (19 + sensor * 2 + sin(i / 9.0 + sensor) * 3)::DOUBLE AS value
-FROM range(120) AS minutes(i), range(1, 4) AS sensors(sensor)
-"""
 
 samples = Path('/samples')
 samples.mkdir(exist_ok=True)
@@ -23,26 +16,10 @@ for name in ['local', 'tls']:
     os.chown(directory, 472, 0)
     directory.chmod(0o750)
 
-snapshot = samples / 'snapshot.duckdb'
-if not snapshot.exists():
-    temporary = samples / 'snapshot-building.duckdb'
-    # A prior interrupted preparation has no readers and can be rebuilt safely.
-    temporary.unlink(missing_ok=True)
-    Path(str(temporary) + '.wal').unlink(missing_ok=True)
-    with duckdb.connect(str(temporary)) as db:
-        db.execute('CREATE TABLE samples AS ' + SAMPLE_SQL)
-        db.execute("""CREATE VIEW measurements AS
-            SELECT date_trunc('minute', now()) - minutes_ago * INTERVAL '1 minute' AS time,
-                   device, value FROM samples""")
-    temporary.chmod(0o644)
-    temporary.replace(snapshot)
-
-parquet = samples / 'temperatures.parquet'
-if not parquet.exists():
-    with duckdb.connect() as db:
-        db.execute("COPY (" + SAMPLE_SQL + ") TO '/samples/temperatures-building.parquet' (FORMAT PARQUET)")
-    (samples / 'temperatures-building.parquet').replace(parquet)
-    parquet.chmod(0o644)
+DIRECTORY.mkdir(exist_ok=True)
+os.chown(DIRECTORY, 472, 0)
+DIRECTORY.chmod(0o755)
+seed()
 
 server = Path('/server-tls')
 clients = Path('/client-tls')
@@ -78,4 +55,4 @@ if not (server / 'ready').exists():
             (target / f'{name}.key').chmod(0o600)
     (server / 'pg_hba.conf').write_text('local all all trust\nhostssl all all all scram-sha-256 clientcert=verify-full\nhostnossl all all all reject\n')
     (server / 'ready').touch()
-print('Read-only DuckDB, Parquet files, lake directories, and TLS certificates are ready.')
+print('Live Parquet data, lake directories, and TLS certificates are ready.')

@@ -1,9 +1,0 @@
-apiVersion: 1
-datasources:
-  - name: Existing DuckDB
-    uid: existing-duckdb
-    type: local-duckdb-datasource
-    access: proxy
-    jsonData:
-      mode: duckdb-read-only
-      path: /var/lib/telemetry/analytics.duckdb

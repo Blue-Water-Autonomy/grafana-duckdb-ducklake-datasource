@@ -64,3 +64,16 @@ func TestLegacyEmbeddedMode(t *testing.T) {
 		t.Fatalf("legacy configuration returned %v", got)
 	}
 }
+
+func TestDefaultEmbeddedMode(t *testing.T) {
+	for _, mode := range []any{nil, ""} {
+		config := map[string]any{"path": filepath.Join(t.TempDir(), "db.duckdb"), "setupSql": "CREATE VIEW example AS SELECT 42 AS value"}
+		if mode != nil {
+			config["mode"] = mode
+		}
+		ds := testSource(t, config)
+		if got := cell(result(t, ds, "SELECT * FROM example", "table"), 0, 0); got != int32(42) {
+			t.Fatalf("default configuration returned %v", got)
+		}
+	}
+}

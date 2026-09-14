@@ -24,7 +24,7 @@ export function ConfigEditor({
   const mode =
     config.mode === "duckdb-managed"
       ? "duckdb-embedded"
-      : (config.mode ?? "duckdb-read-only");
+      : config.mode || "duckdb-embedded";
   const sslMode = config.postgresSslMode ?? "verify-full";
   const set = <K extends keyof Options>(key: K, value: Options[K]) =>
     onOptionsChange({ ...options, jsonData: { ...config, [key]: value } });
@@ -83,10 +83,6 @@ export function ConfigEditor({
             value={mode}
             options={[
               {
-                label: "DuckDB — existing file, read-only",
-                value: "duckdb-read-only",
-              },
-              {
                 label: "Embedded DuckDB — file with setup SQL",
                 value: "duckdb-embedded",
               },
@@ -114,15 +110,13 @@ export function ConfigEditor({
             "path",
             "Database file",
             "/var/lib/grafana/duckdb/analytics.duckdb",
-            mode === "duckdb-read-only"
-              ? "Absolute path on the Grafana server. The file must exist and have no active writer."
-              : "Absolute path on the Grafana server. The database and parent directory are created if missing.",
+            "Absolute path on the Grafana server. The database and parent directory are created if missing. Use views over local files for live data.",
           )}
         {mode === "duckdb-embedded" && (
           <>
             <Field
               label="Setup SQL"
-              description="Runs in a transaction when the data source initializes or settings change. Use persistent, idempotent statements such as CREATE OR REPLACE VIEW."
+              description="Runs when the data source initializes or settings change. Create views over local Parquet globs to query newly published files on each refresh."
             >
               <CodeEditor
                 readOnly={options.readOnly}

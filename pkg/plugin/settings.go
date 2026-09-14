@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	ModeReadOnly = "duckdb-read-only"
 	ModeEmbedded = "duckdb-embedded"
 	ModeDuckLake = "ducklake"
 )
@@ -39,7 +38,7 @@ type Settings struct {
 }
 
 func loadSettings(source backend.DataSourceInstanceSettings) (Settings, error) {
-	s := Settings{Mode: ModeReadOnly, MaxOpenConns: 4, MaxRows: 100000, QueryTimeout: 30, PostgresHost: "localhost", PostgresPort: 5432}
+	s := Settings{Mode: ModeEmbedded, MaxOpenConns: 4, MaxRows: 100000, QueryTimeout: 30, PostgresHost: "localhost", PostgresPort: 5432}
 	if len(source.JSONData) > 0 {
 		if err := json.Unmarshal(source.JSONData, &s); err != nil {
 			return s, fmt.Errorf("invalid data source settings: %w", err)
@@ -47,7 +46,7 @@ func loadSettings(source backend.DataSourceInstanceSettings) (Settings, error) {
 	}
 	s.PostgresPassword = source.DecryptedSecureJSONData["postgresPassword"]
 	if s.Mode == "" {
-		s.Mode = ModeReadOnly
+		s.Mode = ModeEmbedded
 	}
 	// Accept existing provisioning while presenting the new name everywhere.
 	if s.Mode == "duckdb-managed" {
@@ -74,12 +73,9 @@ func loadSettings(source backend.DataSourceInstanceSettings) (Settings, error) {
 		}
 	}
 	switch s.Mode {
-	case ModeReadOnly, ModeEmbedded:
+	case ModeEmbedded:
 		if err := localPath("database path", s.Path); err != nil {
 			return s, err
-		}
-		if s.Mode == ModeReadOnly && (s.SetupSQL != "" || s.SetupSQLPath != "") {
-			return s, fmt.Errorf("setup SQL is only available in embedded DuckDB mode")
 		}
 		if s.SetupSQL != "" && s.SetupSQLPath != "" {
 			return s, fmt.Errorf("choose inline setup SQL or a setup SQL file, not both")

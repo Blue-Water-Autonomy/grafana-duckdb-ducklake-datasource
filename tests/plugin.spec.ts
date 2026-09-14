@@ -74,15 +74,16 @@ test('an administrator can configure embedded setup and choose each mode', async
   };
   const created = await page.request.post('/api/datasources', { data: {
     uid, name: uid, type: 'local-duckdb-datasource', access: 'proxy',
-    jsonData: { mode: 'duckdb-read-only', path: `/tmp/${uid}.duckdb` },
+    jsonData: { path: `/tmp/${uid}.duckdb` },
   } });
   expect(created.ok()).toBeTruthy();
   try {
     await page.goto(`/connections/datasources/edit/${uid}`);
     await expect(page.getByRole('textbox', { name: 'Database file', exact: true })).toBeEnabled();
-    await expect(page.getByRole('textbox', { name: 'Setup SQL file', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Setup SQL file', exact: true })).toBeVisible();
     await page.getByRole('combobox', { name: 'Database mode', exact: true }).click();
-    await page.getByText('Embedded DuckDB — file with setup SQL', { exact: true }).click();
+    await expect(page.getByRole('option')).toHaveCount(2);
+    await page.getByRole('option', { name: 'Embedded DuckDB — file with setup SQL', exact: true }).click();
     const editor = page.getByRole('textbox', { name: 'Editor content;Press Alt+F1 for Accessibility Options.', exact: true });
     await replaceSQL(editor, 'CREATE OR REPLACE VIEW ui_example AS SELECT 42 AS value;');
     await saveAndTest();

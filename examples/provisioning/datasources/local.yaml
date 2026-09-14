@@ -1,14 +1,6 @@
 apiVersion: 1
 prune: true
 datasources:
-  - name: Existing DuckDB (read-only)
-    uid: example-duckdb-readonly
-    type: local-duckdb-datasource
-    access: proxy
-    jsonData:
-      mode: duckdb-read-only
-      path: /samples/snapshot.duckdb
-
   - name: Local DuckDB
     uid: local-duckdb
     type: local-duckdb-datasource
@@ -18,14 +10,9 @@ datasources:
       mode: duckdb-embedded
       path: /var/lib/grafana/duckdb/analytics.duckdb
       setupSql: |
-        CREATE TABLE IF NOT EXISTS samples AS
-        SELECT i::INTEGER AS minutes_ago,
-               'sensor-' || sensor::VARCHAR AS device,
-               (19 + sensor * 2 + sin(i / 9.0 + sensor) * 3)::DOUBLE AS value
-        FROM range(120) AS minutes(i), range(1, 4) AS sensors(sensor);
         CREATE OR REPLACE VIEW example_metrics AS
-        SELECT date_trunc('minute', now()) - minutes_ago * INTERVAL '1 minute' AS time,
-               device, value FROM samples;
+        SELECT time, device, value
+        FROM read_parquet('/samples/measurements/*.parquet');
 
   - name: Embedded DuckDB (Parquet setup file)
     uid: example-duckdb-parquet
