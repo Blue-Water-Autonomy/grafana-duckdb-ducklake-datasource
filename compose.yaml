@@ -1,0 +1,4 @@
+# The runnable example lives under examples/. Both entry points use one project.
+name: duckdb-ducklake-examples
+include:
+  - path: ./examples/compose.yaml

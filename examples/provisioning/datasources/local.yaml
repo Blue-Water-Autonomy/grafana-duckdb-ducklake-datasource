@@ -1,0 +1,61 @@
+apiVersion: 1
+prune: true
+datasources:
+  - name: Local DuckDB
+    uid: local-duckdb
+    type: local-duckdb-datasource
+    access: proxy
+    isDefault: true
+    jsonData:
+      mode: duckdb-embedded
+      path: /var/lib/grafana/duckdb/analytics.duckdb
+      setupSql: |
+        CREATE OR REPLACE VIEW example_metrics AS
+        SELECT time, device, value
+        FROM read_parquet('/samples/measurements/*.parquet');
+
+  - name: Embedded DuckDB (Parquet setup file)
+    uid: example-duckdb-parquet
+    type: local-duckdb-datasource
+    access: proxy
+    jsonData:
+      mode: duckdb-embedded
+      path: /var/lib/grafana/duckdb/parquet.duckdb
+      setupSqlPath: /etc/grafana/duckdb/setup.sql
+
+  - name: Local DuckLake
+    uid: local-ducklake
+    type: local-duckdb-datasource
+    access: proxy
+    jsonData:
+      mode: ducklake
+      postgresHost: postgres
+      postgresPort: 5432
+      postgresDatabase: ducklake
+      postgresUser: ducklake
+      postgresSslMode: disable
+      dataPath: /var/lib/ducklake/local
+      createDuckLake: true
+      extensionDirectory: /opt/duckdb/extensions
+    secureJsonData:
+      postgresPassword: $DUCKLAKE_PASSWORD
+
+  - name: DuckLake (TLS PostgreSQL catalog)
+    uid: example-ducklake-tls
+    type: local-duckdb-datasource
+    access: proxy
+    jsonData:
+      mode: ducklake
+      postgresHost: postgres-tls
+      postgresPort: 5432
+      postgresDatabase: ducklake
+      postgresUser: grafana_reader
+      postgresSslMode: verify-full
+      postgresSslRootCert: /client-tls/ca.crt
+      postgresSslCert: /client-tls/reader.crt
+      postgresSslKey: /client-tls/reader.key
+      dataPath: /var/lib/ducklake/tls
+      createDuckLake: false
+      extensionDirectory: /opt/duckdb/extensions
+    secureJsonData:
+      postgresPassword: $DUCKLAKE_READER_PASSWORD

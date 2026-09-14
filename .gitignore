@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+.env
+.local/
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp/
+test-results/
+playwright-report/

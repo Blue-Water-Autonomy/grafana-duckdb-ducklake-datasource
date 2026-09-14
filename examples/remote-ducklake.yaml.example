@@ -1,0 +1,23 @@
+apiVersion: 1
+datasources:
+  - name: DuckLake
+    uid: ducklake-remote-catalog
+    type: local-duckdb-datasource
+    access: proxy
+    jsonData:
+      mode: ducklake
+      postgresHost: catalog.example.com
+      postgresPort: 5432
+      postgresDatabase: ducklake
+      postgresUser: grafana_reader
+      postgresSslMode: verify-full
+      postgresSslRootCert: /etc/grafana/postgres/ca.crt
+      # Optional mutual TLS. Mount both files and restrict private key permissions.
+      # postgresSslCert: /etc/grafana/postgres/client.crt
+      # postgresSslKey: /etc/grafana/postgres/client.key
+      # Grafana and ingestion must share this directory at the same absolute path.
+      dataPath: /var/lib/ducklake/data
+      createDuckLake: false
+      extensionDirectory: /opt/duckdb/extensions
+    secureJsonData:
+      postgresPassword: $DUCKLAKE_PASSWORD

@@ -1,0 +1,37 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: make check test build integration
+      - run: go test -race ./pkg/plugin
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-duckdb-datasource-linux-amd64
+          path: dist
+  grafana:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: docker compose -f examples/compose.yaml up --build -d --wait
+      - run: curl --retry 30 --retry-all-errors --retry-delay 1 --fail http://localhost:3000/api/health
+      - run: npm run e2e
+      - if: always()
+        run: docker compose -f examples/compose.yaml down

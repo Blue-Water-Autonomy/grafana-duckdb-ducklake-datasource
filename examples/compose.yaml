@@ -1,0 +1,128 @@
+name: duckdb-ducklake-examples
+
+x-sample-image: &sample-image
+  build:
+    context: ..
+    dockerfile: examples/sample-data.Dockerfile
+
+x-catalog-environment: &catalog-environment
+  DUCKLAKE_PASSWORD: ${DUCKLAKE_PASSWORD:-local-development}
+  DUCKLAKE_READER_PASSWORD: ${DUCKLAKE_READER_PASSWORD:-example-reader}
+
+services:
+  prepare-files:
+    <<: *sample-image
+    command: ["python", "/app/prepare.py"]
+    volumes:
+      - sample-files:/samples
+      - lake-data:/var/lib/ducklake
+      - server-tls:/server-tls
+      - client-tls:/client-tls
+
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ducklake
+      POSTGRES_USER: ducklake
+      POSTGRES_PASSWORD: ${DUCKLAKE_PASSWORD:-local-development}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ducklake -d ducklake"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  postgres-tls:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: ducklake
+      POSTGRES_USER: ducklake
+      POSTGRES_PASSWORD: ${DUCKLAKE_PASSWORD:-local-development}
+    command:
+      - postgres
+      - -c
+      - ssl=on
+      - -c
+      - ssl_cert_file=/server-tls/server.crt
+      - -c
+      - ssl_key_file=/server-tls/server.key
+      - -c
+      - ssl_ca_file=/server-tls/ca.crt
+      - -c
+      - hba_file=/server-tls/pg_hba.conf
+    volumes:
+      - postgres-tls-data:/var/lib/postgresql/data
+      - server-tls:/server-tls:ro
+    depends_on:
+      prepare-files:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ducklake -d ducklake"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  seed-catalogs:
+    <<: *sample-image
+    user: "472:0"
+    command: ["python", "-u", "/app/seed.py"]
+    environment: *catalog-environment
+    volumes:
+      - lake-data:/var/lib/ducklake
+      - client-tls:/client-tls:ro
+    depends_on:
+      prepare-files:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      postgres-tls:
+        condition: service_healthy
+
+  ingest:
+    <<: *sample-image
+    user: "472:0"
+    command: ["python", "-u", "/app/ingest.py"]
+    environment: *catalog-environment
+    volumes:
+      - sample-files:/samples
+      - lake-data:/var/lib/ducklake
+      - client-tls:/client-tls:ro
+    depends_on:
+      seed-catalogs:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  grafana:
+    build: ..
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      <<: *catalog-environment
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/overview.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - sample-files:/samples:ro
+      - lake-data:/var/lib/ducklake:ro
+      - client-tls:/client-tls:ro
+      - ./provisioning:/etc/grafana/provisioning:ro
+      - ./dashboards:/etc/grafana/dashboards:ro
+      - ./setup.sql:/etc/grafana/duckdb/setup.sql:ro
+    depends_on:
+      seed-catalogs:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:3000/api/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  grafana-data:
+  sample-files:
+  lake-data:
+  postgres-data:
+  postgres-tls-data:
+  server-tls:
+  client-tls:

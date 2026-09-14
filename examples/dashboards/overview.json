@@ -1,0 +1,607 @@
+{
+  "id": null,
+  "uid": "duckdb-ducklake-examples",
+  "title": "DuckDB / DuckLake examples",
+  "description": "All supported connection modes with automatically seeded data and concurrent DuckLake ingestion.",
+  "tags": [
+    "duckdb",
+    "ducklake",
+    "examples"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "device",
+        "label": "Device",
+        "type": "query",
+        "datasource": {
+          "type": "local-duckdb-datasource",
+          "uid": "local-duckdb"
+        },
+        "query": "SELECT DISTINCT device AS __text, device AS __value FROM example_metrics ORDER BY device",
+        "definition": "SELECT DISTINCT device AS __text, device AS __value FROM example_metrics ORDER BY device",
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Four configurations, live data",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Three sensors report temperatures across all four data sources. Use **Device** to filter every panel. Both embedded DuckDB examples query new Parquet batches; both DuckLake examples receive new rows. The ingestion service publishes fresh measurements every five seconds."
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Inline SQL rows",
+      "description": "Inline setup SQL creates a view over local Parquet batches published every five seconds.",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "local-duckdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 3,
+        "w": 6,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "local-duckdb"
+          },
+          "rawSql": "SELECT count(*) AS samples FROM example_metrics WHERE $__timeFilter(time) AND device IN (${device:sqlstring})",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Embedded DuckDB \u00b7 inline SQL",
+      "description": "Inline setup SQL creates a view over local Parquet batches published every five seconds.",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "local-duckdb"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "local-duckdb"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(time, '$__interval'), device, avg(value) AS value FROM example_metrics WHERE $__timeFilter(time) AND device IN (${device:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "Temperature",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Parquet rows",
+      "description": "A setup SQL file creates a view over local Parquet batches published every five seconds.",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "example-duckdb-parquet"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 3,
+        "w": 6,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "example-duckdb-parquet"
+          },
+          "rawSql": "SELECT count(*) AS samples FROM example_metrics WHERE $__timeFilter(time) AND device IN (${device:sqlstring})",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Embedded DuckDB \u00b7 Parquet",
+      "description": "A setup SQL file creates a view over local Parquet batches published every five seconds.",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "example-duckdb-parquet"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 6,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "example-duckdb-parquet"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(time, '$__interval'), device, avg(value) AS value FROM example_metrics WHERE $__timeFilter(time) AND device IN (${device:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "Temperature",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Local lake rows",
+      "description": "A separate writer continuously inserts data through local PostgreSQL.",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "local-ducklake"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 3,
+        "w": 6,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "local-ducklake"
+          },
+          "rawSql": "SELECT count(*) AS samples FROM measurements WHERE $__timeFilter(time) AND device IN (${device:sqlstring})",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "DuckLake \u00b7 local catalog",
+      "description": "A separate writer continuously inserts data through local PostgreSQL.",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "local-ducklake"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "local-ducklake"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(time, '$__interval'), device, avg(value) AS value FROM measurements WHERE $__timeFilter(time) AND device IN (${device:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "Temperature",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "TLS lake rows",
+      "description": "A PostgreSQL reader role connects to a separate service using verified mutual TLS.",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "example-ducklake-tls"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 3,
+        "w": 6,
+        "h": 3
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "example-ducklake-tls"
+          },
+          "rawSql": "SELECT count(*) AS samples FROM measurements WHERE $__timeFilter(time) AND device IN (${device:sqlstring})",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "DuckLake \u00b7 TLS catalog",
+      "description": "A PostgreSQL reader role connects to a separate service using verified mutual TLS.",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "example-ducklake-tls"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "example-ducklake-tls"
+          },
+          "rawSql": "SELECT $__timeGroupAlias(time, '$__interval'), device, avg(value) AS value FROM measurements WHERE $__timeFilter(time) AND device IN (${device:sqlstring}) GROUP BY 1, 2 ORDER BY 1",
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "decimals": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": false,
+            "axisLabel": "Temperature",
+            "axisPlacement": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "table",
+      "title": "Latest ingested measurements \u00b7 TLS catalog",
+      "datasource": {
+        "type": "local-duckdb-datasource",
+        "uid": "example-ducklake-tls"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "local-duckdb-datasource",
+            "uid": "example-ducklake-tls"
+          },
+          "rawSql": "SELECT time, device, round(value, 2) AS temperature FROM measurements WHERE $__timeFilter(time) AND device IN (${device:sqlstring}) ORDER BY time DESC, device LIMIT 12",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "temperature"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 240
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "device"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": []
+      }
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "links": []
+}
